@@ -54,11 +54,33 @@ func TestBugMaria(t *testing.T) {
 	}
 }
 
-func test(t *testing.T, client *ent.Client) {
+func test(t *testing.T, parent *ent.Client) {
 	ctx := context.Background()
-	client.User.Delete().ExecX(ctx)
-	client.User.Create().SetName("Ariel").SetAge(30).ExecX(ctx)
-	if n := client.User.Query().CountX(ctx); n != 1 {
-		t.Errorf("unexpected number of users: %d", n)
+
+	client, err := parent.Tx(ctx)
+	if err != nil {
+		t.Errorf("unexpected error creating txn: %v", err)
+	}
+
+	createdUser, err := client.User.Create().SetName("Ariel").SetAge(30).Save(ctx)
+	if err != nil {
+		t.Errorf("unexpected error creating user: %v", err)
+	}
+
+	createdProduct, err := client.Product.Create().AddCreatedBy(createdUser).SetName("Expensive Shoes").Save(ctx)
+	if err != nil {
+		t.Errorf("unexpected error creating product: %v", err)
+	}
+
+	if err := client.Commit(); err != nil {
+		t.Errorf("unexpected error committing txn: %v", err)
+	}
+
+	// NOTE: At this point the transaction has been committed but the below query will fail
+	// as the created entity points to the commited transaction
+
+	users, err := createdProduct.QueryCreatedBy().All(ctx)
+	if err != nil || len(users) != 1 {
+		t.Errorf("unexpected number of users: %v", err)
 	}
 }

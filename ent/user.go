@@ -18,7 +18,8 @@ type User struct {
 	// Age holds the value of the "age" field.
 	Age int `json:"age,omitempty"`
 	// Name holds the value of the "name" field.
-	Name string `json:"name,omitempty"`
+	Name               string `json:"name,omitempty"`
+	product_created_by *int
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -30,6 +31,8 @@ func (*User) scanValues(columns []string) ([]interface{}, error) {
 			values[i] = new(sql.NullInt64)
 		case user.FieldName:
 			values[i] = new(sql.NullString)
+		case user.ForeignKeys[0]: // product_created_by
+			values[i] = new(sql.NullInt64)
 		default:
 			return nil, fmt.Errorf("unexpected column %q for type User", columns[i])
 		}
@@ -62,6 +65,13 @@ func (u *User) assignValues(columns []string, values []interface{}) error {
 				return fmt.Errorf("unexpected type %T for field name", values[i])
 			} else if value.Valid {
 				u.Name = value.String
+			}
+		case user.ForeignKeys[0]:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for edge-field product_created_by", value)
+			} else if value.Valid {
+				u.product_created_by = new(int)
+				*u.product_created_by = int(value.Int64)
 			}
 		}
 	}
